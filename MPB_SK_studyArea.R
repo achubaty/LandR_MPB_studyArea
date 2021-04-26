@@ -1,23 +1,18 @@
-## Everything in this file and any files in the R directory are sourced during `simInit()`;
-## all functions and objects are put into the `simList`.
-## To use objects, use `sim$xxx` (they are globally available to all modules).
-## Functions can be used inside any function that was sourced in this module;
-## they are namespaced to the module, just like functions in R packages.
-## If exact location is required, functions will be: `sim$.mods$<moduleName>$FunctionName`.
 defineModule(sim, list(
   name = "MPB_SK_studyArea",
   description = "",
   keywords = "",
-  authors = structure(list(list(given = c("First", "Middle"), family = "Last", role = c("aut", "cre"), email = "email@example.com", comment = NULL)), class = "person"),
+  authors = c(
+    person(c("Alex", "M"), "Chubaty", email = "achubaty@for-cast.ca", role = c("aut", "cre"))
+  ),
   childModules = character(0),
   version = list(SpaDES.core = "1.0.6", MPB_SK_studyArea = "0.0.0.9000"),
   timeframe = as.POSIXlt(c(NA, NA)),
   timeunit = "year",
   citation = list("citation.bib"),
-  documentation = deparse(list("README.txt", "MPB_SK_studyArea.Rmd")),
-  reqdPkgs = list(),
+  documentation = deparse(list("README.md", "MPB_SK_studyArea.Rmd")), ## same file
+  reqdPkgs = list("ggspatial", "raster", "sf"),
   parameters = rbind(
-    #defineParameter("paramName", "paramClass", value, min, max, "parameter description"),
     defineParameter(".plotInitialTime", "numeric", NA, NA, NA,
                     "Describes the simulation time at which the first plot event should occur."),
     defineParameter(".plotInterval", "numeric", NA, NA, NA,
@@ -32,12 +27,16 @@ defineModule(sim, list(
                           "and time are not relevant"))
   ),
   inputObjects = bindrows(
-    #expectsInput("objectName", "objectClass", "input object description", sourceURL, ...),
-    expectsInput(objectName = NA, objectClass = NA, desc = NA, sourceURL = NA)
+    expectsInput(objectName = "targetCRS", objectClass = "character",
+                 desc = "", sourceURL = NA)
   ),
   outputObjects = bindrows(
-    #createsOutput("objectName", "objectClass", "output object description", ...),
-    createsOutput(objectName = NA, objectClass = NA, desc = NA)
+    createsOutput(objectName = "studyArea", objectClass = "SpatialPolygonsDataFrame",
+                  desc = "buffered study area for simulation"),
+    createsOutput(objectName = "studyAreaFit", objectClass = "SpatialPolygonsDataFrame",
+                  desc = "unbuffered study area used for fitting spread data"),
+    createsOutput(objectName = "studyAreaReporting", objectClass = "SpatialPolygonsDataFrame",
+                  desc = "unbuffered study area for reporting/post-processing"),
   )
 ))
 
@@ -60,56 +59,14 @@ doEvent.MPB_SK_studyArea = function(sim, eventTime, eventType) {
     },
     plot = {
       # ! ----- EDIT BELOW ----- ! #
-      # do stuff for this event
-
-      #plotFun(sim) # uncomment this, replace with object to plot
-      # schedule future event(s)
-
-      # e.g.,
-      #sim <- scheduleEvent(sim, time(sim) + P(sim)$.plotInterval, "MPB_SK_studyArea", "plot")
-
+      Plot(mod$gg_studyAreas)
       # ! ----- STOP EDITING ----- ! #
     },
     save = {
       # ! ----- EDIT BELOW ----- ! #
-      # do stuff for this event
-
-      # e.g., call your custom functions/methods here
-      # you can define your own methods below this `doEvent` function
-
-      # schedule future event(s)
-
-      # e.g.,
-      # sim <- scheduleEvent(sim, time(sim) + P(sim)$.saveInterval, "MPB_SK_studyArea", "save")
-
-      # ! ----- STOP EDITING ----- ! #
-    },
-    event1 = {
-      # ! ----- EDIT BELOW ----- ! #
-      # do stuff for this event
-
-      # e.g., call your custom functions/methods here
-      # you can define your own methods below this `doEvent` function
-
-      # schedule future event(s)
-
-      # e.g.,
-      # sim <- scheduleEvent(sim, time(sim) + increment, "MPB_SK_studyArea", "templateEvent")
-
-      # ! ----- STOP EDITING ----- ! #
-    },
-    event2 = {
-      # ! ----- EDIT BELOW ----- ! #
-      # do stuff for this event
-
-      # e.g., call your custom functions/methods here
-      # you can define your own methods below this `doEvent` function
-
-      # schedule future event(s)
-
-      # e.g.,
-      # sim <- scheduleEvent(sim, time(sim) + increment, "MPB_SK_studyArea", "templateEvent")
-
+      figPath <- checkPath(file.path(outputPath(sim), "figures"), create = TRUE)
+      ggsave(mod$gg_studyAreas, filename = file.path(figPath, "mpb_studyArea.png"),
+             width = 7, height = 7)
       # ! ----- STOP EDITING ----- ! #
     },
     warning(paste("Undefined event type: \'", current(sim)[1, "eventType", with = FALSE],
@@ -125,76 +82,70 @@ doEvent.MPB_SK_studyArea = function(sim, eventTime, eventType) {
 Init <- function(sim) {
   # # ! ----- EDIT BELOW ----- ! #
 
+  provinces <- Cache(prepInputs,
+                     "GADM",
+                     fun = "base::readRDS",
+                     dlFun = "raster::getData",
+                     country = "CAN", level = 1, path = inputPath(sim),
+                     targetFile = "gadm36_CAN_1_sp.rds", ## TODO: this will change as GADM data update
+                     cacheRepo = cachePath(sim),
+                     destinationPath = inputPath(sim)) %>%
+    st_as_sf(.) %>%
+    st_transform(., sim$targetCRS) ## keep as sf for plotting
+
+  absk <- provinces[provinces$NAME_1 %in% c("Alberta", "Saskatchewan"), ]
+
+  ecoregions <- prepInputs(url = "http://sis.agr.gc.ca/cansis/nsdb/ecostrat/region/ecoregion_shp.zip",
+                           targetFile = "ecoregions.shp", alsoExtract = "similar",
+                           fun = "sf::st_read",
+                           cacheRepo = cachePath(sim),
+                           destinationPath = inputPath(sim)) %>%
+    st_transform(., sim$targetCRS) ## keep as sf for plotting
+
+  ## study area ecoregions:
+  ##   Wabasca Lowlands (112)
+  ##   Mid-Boreal Uplands (122, 124, 126)
+  ##   Western Alberta Uplands (120)
+  studyAreaReporting <- ecoregions[ecoregions$REGION_ID %in% c(112, 122, 124, 126), ]
+  studyAreaFit <- ecoregions[ecoregions$REGION_ID %in% c(120), ]
+  studyArea <- st_buffer(studyAreaReporting, 10000) ## 10 km buffer
+  studyAreasJoined <- ecoregions[ecoregions$REGION_ID %in% c(112, 122, 124, 126, 120), ] %>%
+    st_intersection(., absk)
+
+  cols <- c("darkgreen", "forestgreen", "darkred")
+  mod$gg_studyAreas <- ggplot(absk) +
+    geom_sf(fill = "white", colour = "black", alpha = 0.5) +
+    geom_sf(data = studyAreasJoined, mapping = aes(fill = REGION_NAM, colour = REGION_NAM), alpha = 0.5) +
+    theme_bw() +
+    annotation_north_arrow(location = "bl", which_north = "true",
+                           pad_x = unit(0.25, "in"), pad_y = unit(0.25, "in"),
+                           style = north_arrow_fancy_orienteering) +
+    xlab("Longitude") + ylab("Latitude") +
+    ggtitle("MPB study areas") +
+    scale_colour_manual(values = cols) +
+    scale_fill_manual(values = cols)
+
+  ## convert to spdf for use with other modules
+  sim$studyAreaReporting <- as_Spatial(studyAreaReporting)
+  sim$studyAreaFit <- as_Spatial(studyAreaFit)
+  sim$studyArea <- as_Spatial(studyArea)
+
   # ! ----- STOP EDITING ----- ! #
 
-  return(invisible(sim))
-}
-
-### template for save events
-Save <- function(sim) {
-  # ! ----- EDIT BELOW ----- ! #
-  # do stuff for this event
-  sim <- saveFiles(sim)
-
-  # ! ----- STOP EDITING ----- ! #
-  return(invisible(sim))
-}
-
-### template for plot events
-plotFun <- function(sim) {
-  # ! ----- EDIT BELOW ----- ! #
-  # do stuff for this event
-  #Plot(sim$object)
-
-  # ! ----- STOP EDITING ----- ! #
-  return(invisible(sim))
-}
-
-### template for your event1
-Event1 <- function(sim) {
-  # ! ----- EDIT BELOW ----- ! #
-  # THE NEXT TWO LINES ARE FOR DUMMY UNIT TESTS; CHANGE OR DELETE THEM.
-  # sim$event1Test1 <- " this is test for event 1. " # for dummy unit test
-  # sim$event1Test2 <- 999 # for dummy unit test
-
-  # ! ----- STOP EDITING ----- ! #
-  return(invisible(sim))
-}
-
-### template for your event2
-Event2 <- function(sim) {
-  # ! ----- EDIT BELOW ----- ! #
-  # THE NEXT TWO LINES ARE FOR DUMMY UNIT TESTS; CHANGE OR DELETE THEM.
-  # sim$event2Test1 <- " this is test for event 2. " # for dummy unit test
-  # sim$event2Test2 <- 777  # for dummy unit test
-
-  # ! ----- STOP EDITING ----- ! #
   return(invisible(sim))
 }
 
 .inputObjects <- function(sim) {
-  # Any code written here will be run during the simInit for the purpose of creating
-  # any objects required by this module and identified in the inputObjects element of defineModule.
-  # This is useful if there is something required before simulation to produce the module
-  # object dependencies, including such things as downloading default datasets, e.g.,
-  # downloadData("LCC2005", modulePath(sim)).
-  # Nothing should be created here that does not create a named object in inputObjects.
-  # Any other initiation procedures should be put in "init" eventType of the doEvent function.
-  # Note: the module developer can check if an object is 'suppliedElsewhere' to
-  # selectively skip unnecessary steps because the user has provided those inputObjects in the
-  # simInit call, or another module will supply or has supplied it. e.g.,
-  # if (!suppliedElsewhere('defaultColor', sim)) {
-  #   sim$map <- Cache(prepInputs, extractURL('map')) # download, extract, load file from url in sourceURL
-  # }
-
   #cacheTags <- c(currentModule(sim), "function:.inputObjects") ## uncomment this if Cache is being used
   dPath <- asPath(getOption("reproducible.destinationPath", dataPath(sim)), 1)
   message(currentModule(sim), ": using dataPath '", dPath, "'.")
 
   # ! ----- EDIT BELOW ----- ! #
+  if (!suppliedElsewhere("targetCRS")) {
+    sim$targetCRS <- paste("+proj=lcc +lat_1=49 +lat_2=77 +lat_0=0 +lon_0=-95",
+                           "+x_0=0 +y_0=0 +units=m +no_defs +ellps=GRS80 +towgs84=0,0,0")
+  }
 
   # ! ----- STOP EDITING ----- ! #
   return(invisible(sim))
 }
-
-### add additional events as needed by copy/pasting from above
