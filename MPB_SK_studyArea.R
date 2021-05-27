@@ -13,9 +13,11 @@ defineModule(sim, list(
   documentation = deparse(list("README.md", "MPB_SK_studyArea.Rmd")), ## same file
   reqdPkgs = list("ggplot2", "ggspatial", "raster", "sf"),
   parameters = rbind(
-    defineParameter(".plotInitialTime", "numeric", NA, NA, NA,
+    defineParameter(".plotInitialTime", "numeric", start(sim), NA, NA,
                     "Describes the simulation time at which the first plot event should occur."),
     defineParameter(".plotInterval", "numeric", NA, NA, NA,
+                    "Describes the simulation time interval between plot events."),
+    defineParameter(".plots", "character", "screen", NA, NA,
                     "Describes the simulation time interval between plot events."),
     defineParameter(".saveInitialTime", "numeric", NA, NA, NA,
                     "Describes the simulation time at which the first save event should occur."),
@@ -59,14 +61,14 @@ doEvent.MPB_SK_studyArea = function(sim, eventTime, eventType) {
     },
     plot = {
       # ! ----- EDIT BELOW ----- ! #
-      Plot(mod$gg_studyAreas)
+      # Plot(mod$gg_studyAreas)
       # ! ----- STOP EDITING ----- ! #
     },
     save = {
       # ! ----- EDIT BELOW ----- ! #
-      figPath <- checkPath(file.path(outputPath(sim), "figures"), create = TRUE)
-      ggsave(mod$gg_studyAreas, filename = file.path(figPath, "mpb_studyArea.png"),
-             width = 7, height = 7)
+      #figPath <- checkPath(file.path(outputPath(sim), "figures"), create = TRUE)
+      #ggsave(mod$gg_studyAreas, filename = file.path(figPath, "mpb_studyArea.png"),
+      #       width = 7, height = 7)
       # ! ----- STOP EDITING ----- ! #
     },
     warning(paste("Undefined event type: \'", current(sim)[1, "eventType", with = FALSE],
@@ -112,23 +114,25 @@ Init <- function(sim) {
   studyAreasJoined <- ecoregions[ecoregions$REGION_ID %in% c(112, 122, 124, 126, 120), ] %>%
     st_intersection(., absk)
 
+  browser()
   cols <- c("darkgreen", "forestgreen", "darkred")
-  mod$gg_studyAreas <- ggplot(absk) +
-    geom_sf(fill = "white", colour = "black", alpha = 0.5) +
-    geom_sf(data = studyAreasJoined, mapping = aes(fill = REGION_NAM, colour = REGION_NAM), alpha = 0.5) +
-    theme_bw() +
-    annotation_north_arrow(location = "bl", which_north = "true",
-                           pad_x = unit(0.25, "in"), pad_y = unit(0.25, "in"),
-                           style = north_arrow_fancy_orienteering) +
-    xlab("Longitude") + ylab("Latitude") +
-    ggtitle("MPB study areas") +
-    scale_colour_manual(values = cols) +
-    scale_fill_manual(values = cols)
+  # Turn this on or off with P(sim)$.plots
+  figPath <- checkPath(file.path(outputPath(sim), "figures"), create = TRUE)
+  Plots(data = absk, cols = cols, studyAreasJoined = studyAreasJoined,
+        .plotInitialTime = time(sim), fn = ggplotStudyAreaFn,
+        types = P(sim)$.plots,
+        filename = file.path(figPath, "mpb_studyArea"),
+        ggsaveArgs = list(width = 7, height = 7)
+        )
+  # mod$gg_studyAreas <-
 
   ## convert to spdf for use with other modules
   sim$studyAreaReporting <- as_Spatial(studyAreaReporting)
   sim$studyAreaFit <- as_Spatial(studyAreaFit)
-  sim$studyArea <- as_Spatial(studyArea)
+
+  # Use larger study area to have all data
+  sim$studyArea <- as_Spatial(studyAreasJoined)
+
 
   # ! ----- STOP EDITING ----- ! #
 
@@ -148,4 +152,18 @@ Init <- function(sim) {
 
   # ! ----- STOP EDITING ----- ! #
   return(invisible(sim))
+}
+
+ggplotStudyAreaFn <- function(absk, cols, studyAreasJoined) {
+  ggplot(absk) +
+    geom_sf(fill = "white", colour = "black", alpha = 0.5) +
+    geom_sf(data = studyAreasJoined, mapping = aes(fill = REGION_NAM, colour = REGION_NAM), alpha = 0.5) +
+    theme_bw() +
+    annotation_north_arrow(location = "bl", which_north = "true",
+                           pad_x = unit(0.25, "in"), pad_y = unit(0.25, "in"),
+                           style = north_arrow_fancy_orienteering) +
+    xlab("Longitude") + ylab("Latitude") +
+    ggtitle("MPB study areas") +
+    scale_colour_manual(values = cols) +
+    scale_fill_manual(values = cols)
 }
