@@ -31,16 +31,15 @@ For help writing in R Markdown, see https://rmarkdown.rstudio.com/.
 ```{r module_usage}
 library(SpaDES.core)
 
-setPaths(modulePath = file.path("/home/achubaty/Documents/GitHub"))
+setPaths(modulePath = file.path("~/GitHub"))
 getPaths() # shows where the 4 relevant paths are
 
-times <- list(start = 0, end = 10)
+times <- list(start = 0, end = 1)
 
 parameters <- list(
-  #.progress = list(type = "text", interval = 1), # for a progress bar
-  ## If there are further modules, each can have its own set of parameters:
-  #module1 = list(param1 = value1, param2 = value2),
-  #module2 = list(param1 = value1, param2 = value2)
+  MPB_SK_studyArea = list(
+    .plotInitialTime = NA
+  )
 )
 modules <- list("MPB_SK_studyArea")
 objects <- list()

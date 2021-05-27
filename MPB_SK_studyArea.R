@@ -11,7 +11,8 @@ defineModule(sim, list(
   timeunit = "year",
   citation = list("citation.bib"),
   documentation = deparse(list("README.md", "MPB_SK_studyArea.Rmd")), ## same file
-  reqdPkgs = list("ggplot2", "ggspatial", "raster", "sf"),
+  reqdPkgs = list("ggplot2", "ggspatial", "raster", "sf",
+                  "PredictiveEcology/mpbutils"),
   parameters = rbind(
     defineParameter(".plotInitialTime", "numeric", start(sim), NA, NA,
                     "Describes the simulation time at which the first plot event should occur."),
@@ -34,9 +35,7 @@ defineModule(sim, list(
   ),
   outputObjects = bindrows(
     createsOutput(objectName = "studyArea", objectClass = "SpatialPolygonsDataFrame",
-                  desc = "buffered study area for simulation"),
-    createsOutput(objectName = "studyAreaFit", objectClass = "SpatialPolygonsDataFrame",
-                  desc = "unbuffered study area used for fitting spread data"),
+                  desc = "buffered study area for simulation and fitting"),
     createsOutput(objectName = "studyAreaReporting", objectClass = "SpatialPolygonsDataFrame",
                   desc = "unbuffered study area for reporting/post-processing"),
   )
@@ -97,22 +96,17 @@ Init <- function(sim) {
 
   absk <- provinces[provinces$NAME_1 %in% c("Alberta", "Saskatchewan"), ]
 
-  ecoregions <- prepInputs(url = "http://sis.agr.gc.ca/cansis/nsdb/ecostrat/region/ecoregion_shp.zip",
-                           targetFile = "ecoregions.shp", alsoExtract = "similar",
-                           fun = "sf::st_read",
-                           cacheRepo = cachePath(sim),
-                           destinationPath = inputPath(sim)) %>%
-    st_transform(., sim$targetCRS) ## keep as sf for plotting
-
   ## study area ecoregions:
   ##   Wabasca Lowlands (112)
   ##   Mid-Boreal Uplands (122, 124, 126)
   ##   Western Alberta Uplands (120)
-  studyAreaReporting <- ecoregions[ecoregions$REGION_ID %in% c(112, 122, 124, 126), ]
-  studyAreaFit <- ecoregions[ecoregions$REGION_ID %in% c(120), ]
+  studyAreaReporting <- mpbStudyArea(ecoregions = c(112, 120, 122, 124, 126),
+                                     targetCRS = sim$targetCRS,
+                                     cPath = cachePath(sim),
+                                     dPath = mod$dPath) %>%
+    st_intersection(., absk) %>%
+    st_union(.)
   studyArea <- st_buffer(studyAreaReporting, 10000) ## 10 km buffer
-  studyAreasJoined <- ecoregions[ecoregions$REGION_ID %in% c(112, 122, 124, 126, 120), ] %>%
-    st_intersection(., absk)
 
   browser()
   cols <- c("darkgreen", "forestgreen", "darkred")
@@ -133,16 +127,13 @@ Init <- function(sim) {
   # Use larger study area to have all data
   sim$studyArea <- as_Spatial(studyAreasJoined)
 
-
-  # ! ----- STOP EDITING ----- ! #
-
   return(invisible(sim))
 }
 
 .inputObjects <- function(sim) {
   #cacheTags <- c(currentModule(sim), "function:.inputObjects") ## uncomment this if Cache is being used
-  dPath <- asPath(getOption("reproducible.destinationPath", dataPath(sim)), 1)
-  message(currentModule(sim), ": using dataPath '", dPath, "'.")
+  mod$dPath <- asPath(getOption("reproducible.destinationPath", dataPath(sim)), 1)
+  message(currentModule(sim), ": using dataPath '", mod$dPath, "'.")
 
   # ! ----- EDIT BELOW ----- ! #
   if (!suppliedElsewhere("targetCRS")) {
