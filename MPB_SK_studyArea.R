@@ -108,8 +108,7 @@ Init <- function(sim) {
     st_union(.)
   studyArea <- st_buffer(studyAreaReporting, 10000) ## 10 km buffer
 
-  browser()
-  cols <- c("darkgreen", "forestgreen", "darkred")
+  cols <- "darkgreen"
   # Turn this on or off with P(sim)$.plots
   figPath <- checkPath(file.path(outputPath(sim), "figures"), create = TRUE)
   Plots(
@@ -148,7 +147,7 @@ Init <- function(sim) {
 ggplotStudyAreaFn <- function(absk, cols, studyArea) {
   ggplot(absk) +
     geom_sf(fill = "white", colour = "black", alpha = 0.5) +
-    geom_sf(data = studyArea, mapping = aes(fill = REGION_NAM, colour = REGION_NAM), alpha = 0.5) +
+    geom_sf(data = studyArea, mapping = aes(fill = cols, colour = cols), alpha = 0.5) +
     theme_bw() +
     annotation_north_arrow(location = "bl", which_north = "true",
                            pad_x = unit(0.25, "in"), pad_y = unit(0.25, "in"),
