@@ -12,7 +12,7 @@ defineModule(sim, list(
   citation = list("citation.bib"),
   documentation = deparse(list("README.md", "MPB_SK_studyArea.Rmd")), ## same file
   reqdPkgs = list("ggplot2", "ggspatial", "raster", "sf",
-                  "PredictiveEcology/mpbutils"),
+                  "PredictiveEcology/mpbutils (>= 0.1.2)"),
   parameters = rbind(
     defineParameter(".plotInitialTime", "numeric", start(sim), NA, NA,
                     "Describes the simulation time at which the first plot event should occur."),
