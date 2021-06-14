@@ -12,11 +12,13 @@ defineModule(sim, list(
   citation = list("citation.bib"),
   documentation = deparse(list("README.md", "MPB_SK_studyArea.Rmd")), ## same file
   reqdPkgs = list("ggplot2", "ggspatial", "raster", "sf",
-                  "PredictiveEcology/mpbutils"),
+                  "PredictiveEcology/mpbutils (>= 0.1.2)"),
   parameters = rbind(
-    defineParameter(".plotInitialTime", "numeric", NA, NA, NA,
+    defineParameter(".plotInitialTime", "numeric", start(sim), NA, NA,
                     "Describes the simulation time at which the first plot event should occur."),
     defineParameter(".plotInterval", "numeric", NA, NA, NA,
+                    "Describes the simulation time interval between plot events."),
+    defineParameter(".plots", "character", "screen", NA, NA,
                     "Describes the simulation time interval between plot events."),
     defineParameter(".saveInitialTime", "numeric", NA, NA, NA,
                     "Describes the simulation time at which the first save event should occur."),
@@ -64,9 +66,9 @@ doEvent.MPB_SK_studyArea = function(sim, eventTime, eventType) {
     },
     save = {
       # ! ----- EDIT BELOW ----- ! #
-      figPath <- checkPath(file.path(outputPath(sim), "figures"), create = TRUE)
-      ggsave(mod$gg_studyAreas, filename = file.path(figPath, "mpb_studyArea.png"),
-             width = 7, height = 7)
+      #figPath <- checkPath(file.path(outputPath(sim), "figures"), create = TRUE)
+      #ggsave(mod$gg_studyAreas, filename = file.path(figPath, "mpb_studyArea.png"),
+      #       width = 7, height = 7)
       # ! ----- STOP EDITING ----- ! #
     },
     warning(paste("Undefined event type: \'", current(sim)[1, "eventType", with = FALSE],
@@ -107,21 +109,22 @@ Init <- function(sim) {
     st_union(.)
   studyArea <- st_buffer(studyAreaReporting, 10000) ## 10 km buffer
 
-  mod$gg_studyAreas <- ggplot(absk) +
-    geom_sf(fill = "white", colour = "black", alpha = 0.5) +
-    geom_sf(data = studyAreaReporting, fill = "darkgreen", colour = "darkgreen", alpha = 0.5) +
-    theme_bw() +
-    annotation_north_arrow(location = "bl", which_north = "true",
-                           pad_x = unit(0.25, "in"), pad_y = unit(0.25, "in"),
-                           style = north_arrow_fancy_orienteering) +
-    xlab("Longitude") + ylab("Latitude") +
-    ggtitle("MPB study area")
+  # Turn this on or off with P(sim)$.plots
+  figPath <- checkPath(file.path(outputPath(sim), "figures"), create = TRUE)
+  Plots(
+    data = absk, studyArea = studyAreaReporting,
+    .plotInitialTime = time(sim),
+    fn = ggplotStudyAreaFn,
+    types = P(sim)$.plots,
+    filename = file.path(figPath, "mpb_studyArea"),
+    ggsaveArgs = list(width = 7, height = 7)
+  )
 
   ## convert to spdf for use with other modules
-  sim$studyArea <- as_Spatial(studyArea)
   sim$studyAreaReporting <- as_Spatial(studyAreaReporting)
 
-  # ! ----- STOP EDITING ----- ! #
+  # Use larger study area to have all data
+  sim$studyArea <- as_Spatial(studyArea)
 
   return(invisible(sim))
 }
@@ -139,4 +142,16 @@ Init <- function(sim) {
 
   # ! ----- STOP EDITING ----- ! #
   return(invisible(sim))
+}
+
+ggplotStudyAreaFn <- function(absk, studyArea) {
+  ggplot(absk) +
+    geom_sf(fill = "white", colour = "black", alpha = 0.5) +
+    geom_sf(data = studyArea, fill = "darkgreen", colour = "darkgreen", alpha = 0.5) +
+    theme_bw() +
+    annotation_north_arrow(location = "bl", which_north = "true",
+                           pad_x = unit(0.25, "in"), pad_y = unit(0.25, "in"),
+                           style = north_arrow_fancy_orienteering) +
+    xlab("Longitude") + ylab("Latitude") +
+    ggtitle("MPB study areas")
 }
