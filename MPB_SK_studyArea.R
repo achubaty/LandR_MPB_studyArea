@@ -58,7 +58,8 @@ doEvent.MPB_SK_studyArea = function(sim, eventTime, eventType) {
     },
     plot = {
       # ! ----- EDIT BELOW ----- ! #
-      Plot(mod$gg_studyAreas)
+      studyArea <- mod$gg_studyAreas
+      Plot(studyArea)
       # ! ----- STOP EDITING ----- ! #
     },
     save = {
@@ -106,18 +107,15 @@ Init <- function(sim) {
     st_union(.)
   studyArea <- st_buffer(studyAreaReporting, 10000) ## 10 km buffer
 
-  cols <- c("darkgreen", "forestgreen", "darkred")
   mod$gg_studyAreas <- ggplot(absk) +
     geom_sf(fill = "white", colour = "black", alpha = 0.5) +
-    geom_sf(data = studyArea, mapping = aes(fill = REGION_NAM, colour = REGION_NAM), alpha = 0.5) +
+    geom_sf(data = studyAreaReporting, fill = "darkgreen", colour = "darkgreen", alpha = 0.5) +
     theme_bw() +
     annotation_north_arrow(location = "bl", which_north = "true",
                            pad_x = unit(0.25, "in"), pad_y = unit(0.25, "in"),
                            style = north_arrow_fancy_orienteering) +
     xlab("Longitude") + ylab("Latitude") +
-    ggtitle("MPB study area") +
-    scale_colour_manual(values = cols) +
-    scale_fill_manual(values = cols)
+    ggtitle("MPB study area")
 
   ## convert to spdf for use with other modules
   sim$studyArea <- as_Spatial(studyArea)
