@@ -153,5 +153,5 @@ ggplotStudyAreaFn <- function(absk, studyArea) {
                            pad_x = unit(0.25, "in"), pad_y = unit(0.25, "in"),
                            style = north_arrow_fancy_orienteering) +
     xlab("Longitude") + ylab("Latitude") +
-    ggtitle("MPB study areas")
+    ggtitle("MPB study area")
 }
