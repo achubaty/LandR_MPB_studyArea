@@ -34,10 +34,13 @@ defineModule(sim, list(
                  desc = "", sourceURL = NA)
   ),
   outputObjects = bindrows(
+    createsOutput(objectName = "absk", objectClass = "SpatialPolygonsDataFrame",
+                  desc = "Alberta and Saskatchewan political outlines"),
     createsOutput(objectName = "studyArea", objectClass = "SpatialPolygonsDataFrame",
                   desc = "buffered study area for simulation and fitting"),
     createsOutput(objectName = "studyAreaReporting", objectClass = "SpatialPolygonsDataFrame",
                   desc = "unbuffered study area for reporting/post-processing"),
+
   )
 ))
 
@@ -95,7 +98,7 @@ Init <- function(sim) {
     st_as_sf(.) %>%
     st_transform(., sim$targetCRS) ## keep as sf for plotting
 
-  absk <- provinces[provinces$NAME_1 %in% c("Alberta", "Saskatchewan"), ]
+  sim$absk <- provinces[provinces$NAME_1 %in% c("Alberta", "Saskatchewan"), ]
 
   ## study area ecoregions:
   ##   Wabasca Lowlands (112)
@@ -105,14 +108,14 @@ Init <- function(sim) {
                                      targetCRS = sim$targetCRS,
                                      cPath = cachePath(sim),
                                      dPath = mod$dPath) %>%
-    st_intersection(., absk) %>%
+    st_intersection(., sim$absk) %>%
     st_union(.)
   studyArea <- st_buffer(studyAreaReporting, 10000) ## 10 km buffer
 
   # Turn this on or off with P(sim)$.plots
   figPath <- checkPath(file.path(outputPath(sim), "figures"), create = TRUE)
   Plots(
-    data = absk, studyArea = studyAreaReporting,
+    data = sim$absk, cols = cols, studyArea = studyAreaReporting,
     .plotInitialTime = time(sim),
     fn = ggplotStudyAreaFn,
     types = P(sim)$.plots,
@@ -144,8 +147,8 @@ Init <- function(sim) {
   return(invisible(sim))
 }
 
-ggplotStudyAreaFn <- function(absk, studyArea) {
-  ggplot(absk) +
+ggplotStudyAreaFn <- function(poly, cols, studyArea) {
+  ggplot(poly) +
     geom_sf(fill = "white", colour = "black", alpha = 0.5) +
     geom_sf(data = studyArea, fill = "darkgreen", colour = "darkgreen", alpha = 0.5) +
     theme_bw() +
