@@ -8,6 +8,7 @@ on:
       - main
       - development
     paths:
+      - .github/workflows/render-module-rmd.yaml
       - MPB_SK_studyArea.Rmd
       - MPB_SK_studyArea.R
 
