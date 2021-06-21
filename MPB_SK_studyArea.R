@@ -18,7 +18,7 @@ defineModule(sim, list(
                     "Describes the simulation time at which the first plot event should occur."),
     defineParameter(".plotInterval", "numeric", NA, NA, NA,
                     "Describes the simulation time interval between plot events."),
-    defineParameter(".plots", "character", "screen", NA, NA,
+    defineParameter(".plots", "character", c("screen", "png"), NA, NA,
                     "Describes the simulation time interval between plot events."),
     defineParameter(".saveInitialTime", "numeric", NA, NA, NA,
                     "Describes the simulation time at which the first save event should occur."),
@@ -39,8 +39,7 @@ defineModule(sim, list(
     createsOutput(objectName = "studyArea", objectClass = "SpatialPolygonsDataFrame",
                   desc = "buffered study area for simulation and fitting"),
     createsOutput(objectName = "studyAreaReporting", objectClass = "SpatialPolygonsDataFrame",
-                  desc = "unbuffered study area for reporting/post-processing"),
-
+                  desc = "unbuffered study area for reporting/post-processing")
   )
 ))
 
