@@ -99,6 +99,13 @@ Init <- function(sim) {
 
   sim$absk <- provinces[provinces$NAME_1 %in% c("Alberta", "Saskatchewan"), ]
 
+  slaveLake <- prepInputs(url = "https://static.ags.aer.ca/files/document/DIG/DIG_2008_0793.zip",
+                          archive = "DIG_2008_0793.zip",
+                          targetFile = "less_bdy_py_tm.shp",
+                          alsoExtract = "similar",
+                          fun = "sf::st_read",
+                          destinationPath = inputPath(sim))
+
   ## study area ecoregions:
   ##   Wabasca Lowlands (112)
   ##   Mid-Boreal Uplands (122, 124, 126)
@@ -114,7 +121,7 @@ Init <- function(sim) {
   # Turn this on or off with P(sim)$.plots
   figPath <- checkPath(file.path(outputPath(sim), "figures"), create = TRUE)
   Plots(
-    data = sim$absk, cols = cols, studyArea = studyAreaReporting,
+    data = sim$absk, cols = cols, studyArea = studyAreaReporting, lake = slaveLake,
     .plotInitialTime = time(sim),
     fn = ggplotStudyAreaFn,
     types = P(sim)$.plots,
@@ -146,10 +153,11 @@ Init <- function(sim) {
   return(invisible(sim))
 }
 
-ggplotStudyAreaFn <- function(poly, cols, studyArea) {
+ggplotStudyAreaFn <- function(poly, cols, studyArea, lake) {
   ggplot(poly) +
     geom_sf(fill = "white", colour = "black", alpha = 0.5) +
     geom_sf(data = studyArea, fill = "darkgreen", colour = "darkgreen", alpha = 0.5) +
+    geom_sf(data = lake, fill = "blue", colour = "blue", alpha = 0.5) +
     theme_bw() +
     annotation_north_arrow(location = "bl", which_north = "true",
                            pad_x = unit(0.25, "in"), pad_y = unit(0.25, "in"),
