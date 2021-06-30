@@ -1,16 +1,16 @@
 defineModule(sim, list(
-  name = "MPB_SK_studyArea",
+  name = "LandR_MPB_studyArea",
   description = "",
   keywords = "",
   authors = c(
     person(c("Alex", "M"), "Chubaty", email = "achubaty@for-cast.ca", role = c("aut", "cre"))
   ),
   childModules = character(0),
-  version = list(SpaDES.core = "1.0.6", MPB_SK_studyArea = "0.0.0.9000"),
+  version = list(SpaDES.core = "1.0.6", LandR_MPB_studyArea = "0.0.0.9000"),
   timeframe = as.POSIXlt(c(NA, NA)),
   timeunit = "year",
   citation = list("citation.bib"),
-  documentation = deparse(list("README.md", "MPB_SK_studyArea.Rmd")), ## same file
+  documentation = deparse(list("README.md", "LandR_MPB_studyArea.Rmd")), ## same file
   reqdPkgs = list("ggplot2", "ggspatial", "raster", "sf",
                   "PredictiveEcology/mpbutils (>= 0.1.2)"),
   parameters = rbind(
@@ -46,7 +46,7 @@ defineModule(sim, list(
 ## event types
 #   - type `init` is required for initialization
 
-doEvent.MPB_SK_studyArea = function(sim, eventTime, eventType) {
+doEvent.LandR_MPB_studyArea = function(sim, eventTime, eventType) {
   switch(
     eventType,
     init = {
@@ -57,8 +57,8 @@ doEvent.MPB_SK_studyArea = function(sim, eventTime, eventType) {
       sim <- Init(sim)
 
       # schedule future event(s)
-      sim <- scheduleEvent(sim, P(sim)$.plotInitialTime, "MPB_SK_studyArea", "plot")
-      sim <- scheduleEvent(sim, P(sim)$.saveInitialTime, "MPB_SK_studyArea", "save")
+      sim <- scheduleEvent(sim, P(sim)$.plotInitialTime, "LandR_MPB_studyArea", "plot")
+      sim <- scheduleEvent(sim, P(sim)$.saveInitialTime, "LandR_MPB_studyArea", "save")
     },
     plot = {
       # ! ----- EDIT BELOW ----- ! #

@@ -9,7 +9,7 @@
 ## 3. Modify the test description based on the content you are testing.
 ##
 test_that("test Event1 and Event2.", {
-  module <- list("MPB_SK_studyArea")
+  module <- list("LandR_MPB_studyArea")
   path <- list(
     modulePath = "/home/achubaty/Documents/GitHub",
     outputPath = file.path(tempdir(), "outputs")
@@ -17,7 +17,7 @@ test_that("test Event1 and Event2.", {
   parameters <- list(
     #.progress = list(type = graphical, interval = 1),
     .globals = list(verbose = FALSE),
-    MPB_SK_studyArea = list(.saveInitialTime = NA)
+    LandR_MPB_studyArea = list(.saveInitialTime = NA)
   )
   times <- list(start = 0, end = 1)
 
