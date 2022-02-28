@@ -57,22 +57,22 @@ doEvent.LandR_MPB_studyArea = function(sim, eventTime, eventType) {
       sim <- Init(sim)
 
       # schedule future event(s)
-      sim <- scheduleEvent(sim, P(sim)$.plotInitialTime, "LandR_MPB_studyArea", "plot")
-      sim <- scheduleEvent(sim, P(sim)$.saveInitialTime, "LandR_MPB_studyArea", "save")
+      # sim <- scheduleEvent(sim, P(sim)$.plotInitialTime, "LandR_MPB_studyArea", "plot")
+      # sim <- scheduleEvent(sim, P(sim)$.saveInitialTime, "LandR_MPB_studyArea", "save")
     },
-    plot = {
-      # ! ----- EDIT BELOW ----- ! #
-      studyArea <- mod$gg_studyAreas
-      Plot(studyArea)
-      # ! ----- STOP EDITING ----- ! #
-    },
-    save = {
-      # ! ----- EDIT BELOW ----- ! #
-      #figPath <- checkPath(file.path(outputPath(sim), "figures"), create = TRUE)
-      #ggsave(mod$gg_studyAreas, filename = file.path(figPath, "mpb_studyArea.png"),
-      #       width = 7, height = 7)
-      # ! ----- STOP EDITING ----- ! #
-    },
+    # plot = {
+    #   # ! ----- EDIT BELOW ----- ! #
+    #   studyArea <- mod$gg_studyAreas
+    #   Plot(studyArea)
+    #   # ! ----- STOP EDITING ----- ! #
+    # },
+    # save = {
+    #   # ! ----- EDIT BELOW ----- ! #
+    #   #figPath <- checkPath(file.path(outputPath(sim), "figures"), create = TRUE)
+    #   #ggsave(mod$gg_studyAreas, filename = file.path(figPath, "mpb_studyArea.png"),
+    #   #       width = 7, height = 7)
+    #   # ! ----- STOP EDITING ----- ! #
+    # },
     warning(paste("Undefined event type: \'", current(sim)[1, "eventType", with = FALSE],
                   "\' in module \'", current(sim)[1, "moduleName", with = FALSE], "\'", sep = ""))
   )
@@ -86,18 +86,22 @@ doEvent.LandR_MPB_studyArea = function(sim, eventTime, eventType) {
 Init <- function(sim) {
   # # ! ----- EDIT BELOW ----- ! #
 
-  provinces <- Cache(prepInputs,
+  opts <- options(reproducible.useTerra = TRUE)
+  on.exit(options(opts))
+
+  sim$absk <- Cache(prepInputs,
                      "GADM",
-                     fun = "base::readRDS",
-                     dlFun = "raster::getData",
+                     fun = loadABSK, #base::readRDS",
+                     dlFun = "raster::getData", targetCRS = sim$targetCRS,
                      country = "CAN", level = 1, path = inputPath(sim),
                      targetFile = "gadm36_CAN_1_sp.rds", ## TODO: this will change as GADM data update
                      cacheRepo = cachePath(sim),
-                     destinationPath = inputPath(sim)) %>%
-    st_as_sf(.) %>%
-    st_transform(., sim$targetCRS) ## keep as sf for plotting
+                     destinationPath = inputPath(sim))# %>%
 
-  sim$absk <- provinces[provinces$NAME_1 %in% c("Alberta", "Saskatchewan"), ]
+  # Put these all inside the load function (loadABSK) so it is faster next time!
+  #   st_as_sf(.) %>%
+  #   st_transform(., sim$targetCRS) ## keep as sf for plotting
+  # sim$absk <- provinces[provinces$NAME_1 %in% c("Alberta", "Saskatchewan"), ]
 
   slaveLake <- prepInputs(url = "https://static.ags.aer.ca/files/document/DIG/DIG_2008_0793.zip",
                           archive = "DIG_2008_0793.zip",
@@ -164,4 +168,11 @@ ggplotStudyAreaFn <- function(poly, cols, studyArea, lake) {
                            style = north_arrow_fancy_orienteering) +
     xlab("Longitude") + ylab("Latitude") +
     ggtitle("MPB study area")
+}
+
+loadABSK <- function(x, targetCRS) {
+  x <- base::readRDS(x)
+  x <- x[x$NAME_1 %in% c("Alberta", "Saskatchewan"), ]
+  x <- st_as_sf(x)
+  x <- st_transform(x, targetCRS) ## keep as sf for plotting
 }
