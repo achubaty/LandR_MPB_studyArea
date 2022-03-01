@@ -89,10 +89,20 @@ Init <- function(sim) {
   opts <- options(reproducible.useTerra = TRUE)
   on.exit(options(opts))
 
+  targetCRS <- sim$targetCRS
+  # The following is sloppy -- needs this first preProcess to getData
+  #   second prepInputs will fail if the getData didn't already run, because of ...
+  Cache(preProcess,
+        dlFun = "raster::getData", targetCRS = sim$targetCRS,
+        loadABSK = loadABSK,
+        country = "CAN", level = 1, path = inputPath(sim),
+        targetFile = "gadm36_CAN_1_sp.rds" ## TODO: this will change as GADM data update
+  )
   sim$absk <- Cache(prepInputs,
                      "GADM",
-                     fun = loadABSK, #base::readRDS",
+                     fun = quote(loadABSK(targetFilePath, targetCRS)), #base::readRDS",
                      dlFun = "raster::getData", targetCRS = sim$targetCRS,
+                     loadABSK = loadABSK,
                      country = "CAN", level = 1, path = inputPath(sim),
                      targetFile = "gadm36_CAN_1_sp.rds", ## TODO: this will change as GADM data update
                      cacheRepo = cachePath(sim),
