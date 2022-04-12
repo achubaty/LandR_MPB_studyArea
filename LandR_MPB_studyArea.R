@@ -34,7 +34,7 @@ defineModule(sim, list(
                  desc = "", sourceURL = NA)
   ),
   outputObjects = bindrows(
-    createsOutput(objectName = "absk", objectClass = "SpatialPolygonsDataFrame",
+    createsOutput(objectName = "absk", objectClass = "sf",
                   desc = "Alberta and Saskatchewan political outlines"),
     createsOutput(objectName = "studyArea", objectClass = "SpatialPolygonsDataFrame",
                   desc = "buffered study area for simulation and fitting"),
@@ -93,25 +93,19 @@ Init <- function(sim) {
   # The following is sloppy -- needs this first preProcess to getData
   #   second prepInputs will fail if the getData didn't already run, because of ...
   tmp_res <- Cache(preProcess,
-        "GADM",
-        country = "CAN", level = 1, path = inputPath(sim),
-        dlFun = "raster::getData",
-        targetFile = "gadm36_CAN_1_sp.rds" ## TODO: this will change as GADM data update
-  )
+                   "GADM",
+                   country = "CAN", level = 1, path = inputPath(sim),
+                   dlFun = "raster::getData",
+                   targetFile = "gadm36_CAN_1_sp.rds") ## TODO: this will change as GADM data update
   sim$absk <- Cache(prepInputs,
-                     "GADM",
-                     fun = quote(loadABSK(targetFilePath, targetCRS)), #base::readRDS",
-                     dlFun = "raster::getData", targetCRS = sim$targetCRS,
-                     loadABSK = loadABSK,
-                     country = "CAN", level = 1, path = inputPath(sim),
-                     targetFile = "gadm36_CAN_1_sp.rds", ## TODO: this will change as GADM data update
-                     cacheRepo = cachePath(sim),
-                     destinationPath = inputPath(sim))# %>%
-
-  # Put these all inside the load function (loadABSK) so it is faster next time!
-  #   st_as_sf(.) %>%
-  #   st_transform(., sim$targetCRS) ## keep as sf for plotting
-  # sim$absk <- provinces[provinces$NAME_1 %in% c("Alberta", "Saskatchewan"), ]
+                    "GADM",
+                    fun = quote(loadABSK(targetFilePath, targetCRS)), #base::readRDS",
+                    dlFun = "raster::getData", targetCRS = sim$targetCRS,
+                    loadABSK = loadABSK,
+                    country = "CAN", level = 1, path = inputPath(sim),
+                    targetFile = "gadm36_CAN_1_sp.rds", ## TODO: this will change as GADM data update
+                    cacheRepo = cachePath(sim),
+                    destinationPath = inputPath(sim))
 
   slaveLake <- prepInputs(url = "https://static.ags.aer.ca/files/document/DIG/DIG_2008_0793.zip",
                           archive = "DIG_2008_0793.zip",
