@@ -92,10 +92,10 @@ Init <- function(sim) {
   targetCRS <- sim$targetCRS
   # The following is sloppy -- needs this first preProcess to getData
   #   second prepInputs will fail if the getData didn't already run, because of ...
-  Cache(preProcess,
-        dlFun = "raster::getData", targetCRS = sim$targetCRS,
-        loadABSK = loadABSK,
+  tmp_res <- Cache(preProcess,
+        "GADM",
         country = "CAN", level = 1, path = inputPath(sim),
+        dlFun = "raster::getData",
         targetFile = "gadm36_CAN_1_sp.rds" ## TODO: this will change as GADM data update
   )
   sim$absk <- Cache(prepInputs,
