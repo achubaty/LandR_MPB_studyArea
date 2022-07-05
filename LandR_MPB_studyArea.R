@@ -142,7 +142,7 @@ InitStudyArea <- function(sim) {
   ## NOTE: studyArea and studyAreaLarge are the same [buffered] area
   ## convert to spdf for use with other modules
   sim$studyAreaReporting <- as_Spatial(studyAreaReporting)
-  sim$studyArea <- as_Spatial(studyArea)
+  sim$studyArea <- as_Spatial(studyArea) ## TODO: st_convex_hull() ?
   sim$studyAreaLarge <- sim$studyArea
 
   ecozones2use <- c("Boreal PLain", "Boreal Shield")
@@ -203,14 +203,16 @@ InitSpecies <- function(sim) {
   cacheTags <- c(currentModule(sim), "function:.inputObjects")
   dPath <- asPath(getOption("reproducible.destinationPath", dataPath(sim)), 1)
 
-  sppEquiv <- LandR::sppEquivalencies_CA
-  spp2use <- c("Abie_Bal", "Abie_Las",
-               "Betu_Pap",
-               "Lari_Lar",
-               "Pice_Gla", "Pice_Mar", ## "Pice_Eng" ?
-               "Pinu_Ban", "Pinu_Con",
-               "Popu_Tre")
-  sim$sppEquiv <- sppEquiv[KNN %in% spp2use]
+  spp <- Cache(LandR::speciesInStudyArea, sim$studyArea)
+
+  ## omit generic '*_Spp'
+  spp2use <- grep("_Spp", spp$speciesList, invert = TRUE, value = TRUE)
+
+  ## omit Lari_lya: no trait values & only occurs in 2 pixels within study area
+  spp2use <- grep("Lari_Lya", spp2use, invert = TRUE, value = TRUE)
+
+  spp2use <- sort(spp2use)
+  sim$sppEquiv <- LandR::sppEquivalencies_CA[KNN %in% spp2use]
   sim$sppEquivCol <- "LandR"
   sim$sppColorVect <- LandR::sppColors(sppEquiv = sim$sppEquiv, sppEquivCol = sim$sppEquivCol,
                                        palette = "Paired", newVals = "Mixed")
