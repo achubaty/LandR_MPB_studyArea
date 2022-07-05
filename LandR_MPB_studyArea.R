@@ -70,7 +70,9 @@ doEvent.LandR_MPB_studyArea = function(sim, eventTime, eventType) {
   switch(
     eventType,
     init = {
-      sim <- Init(sim)
+      sim <- InitStudyArea(sim)
+      sim <- InitRTM(sim)
+      sim <- InitSpecies(sim)
     },
     warning(paste("Undefined event type: \'", current(sim)[1, "eventType", with = FALSE],
                   "\' in module \'", current(sim)[1, "moduleName", with = FALSE], "\'", sep = ""))
@@ -82,12 +84,12 @@ doEvent.LandR_MPB_studyArea = function(sim, eventTime, eventType) {
 #   - keep event functions short and clean, modularize by calling subroutines from section below.
 
 ### template initialization
-Init <- function(sim) {
+InitStudyArea <- function(sim) {
   cacheTags <- c(currentModule(sim), "function:.inputObjects")
   dPath <- asPath(getOption("reproducible.destinationPath", dataPath(sim)), 1)
 
-  mod$targetCRS <- paste("+proj=lcc +lat_1=49 +lat_2=77 +lat_0=0 +lon_0=-95",
-                         "+x_0=0 +y_0=0 +units=m +no_defs +ellps=GRS80 +towgs84=0,0,0")
+  targetCRS <- paste("+proj=lcc +lat_1=49 +lat_2=77 +lat_0=0 +lon_0=-95",
+                     "+x_0=0 +y_0=0 +units=m +no_defs +ellps=GRS80 +towgs84=0,0,0")
 
   # The following is sloppy -- needs this first preProcess to getData
   #   second prepInputs will fail if the getData didn't already run, because of ...
@@ -99,8 +101,8 @@ Init <- function(sim) {
 
   sim$absk <- Cache(prepInputs,
                     "GADM",
-                    fun = quote(loadABSK(targetFilePath, targetCRS)), #base::readRDS",
-                    dlFun = "raster::getData", targetCRS = mod$targetCRS,
+                    fun = quote(loadABSK(targetFilePath, targetCRS)),
+                    dlFun = "raster::getData", targetCRS = targetCRS,
                     loadABSK = loadABSK,
                     country = "CAN", level = 1, path = dPath,
                     targetFile = "gadm36_CAN_1_sp.rds", ## TODO: this will change as GADM data update
@@ -119,7 +121,7 @@ Init <- function(sim) {
   ##   Mid-Boreal Uplands (122, 124, 126)
   ##   Western Alberta Uplands (120)
   studyAreaReporting <- mpbStudyArea(ecoregions = P(sim)$ecoregions4studyArea,
-                                     targetCRS = mod$targetCRS,
+                                     targetCRS = targetCRS,
                                      cPath = cachePath(sim),
                                      dPath = dPath) %>%
     st_intersection(., sim$absk) %>%
@@ -143,6 +145,47 @@ Init <- function(sim) {
   sim$studyArea <- as_Spatial(studyArea)
   sim$studyAreaLarge <- sim$studyArea
 
+  ecozones2use <- c("Boreal PLain", "Boreal Shield")
+
+  ecozones_absk <- Cache(prepInputs,
+                         targetFile = "ecozones.shp",
+                         archive = asPath("ecozone_shp.zip"),
+                         url = "https://sis.agr.gc.ca/cansis/nsdb/ecostrat/zone/ecozone_shp.zip",
+                         alsoExtract = "similar",
+                         destinationPath = dPath,
+                         filename2 = NULL,
+                         studyArea = sim$absk,
+                         overwrite = TRUE,
+                         useSAcrs = TRUE,
+                         fun = "sf::st_read",
+                         userTags = c("prepInputsEcozones", currentModule(sim), cacheTags))
+  ecozones_absk <- ecozones_absk[ecozones_absk$ZONE_NAME %in% ecozones2use, ] ## remove boundary artifacts
+
+  ecozones_SA <- Cache(prepInputs,
+                       targetFile = "ecozones.shp",
+                       archive = asPath("ecozone_shp.zip"),
+                       url = "https://sis.agr.gc.ca/cansis/nsdb/ecostrat/zone/ecozone_shp.zip",
+                       alsoExtract = "similar",
+                       destinationPath = dPath,
+                       filename2 = NULL,
+                       studyArea = sim$studyAreaReporting,
+                       overwrite = TRUE,
+                       useSAcrs = TRUE,
+                       fun = "sf::st_read",
+                       userTags = c("prepInputsEcozones", currentModule(sim), cacheTags))
+  ecozones_SA <- ecozones_SA[ecozones_SA$ZONE_NAME %in% ecozones2use, ] ## remove boundary artifacts
+
+  ## use ecozone boundaries within WBI study area for parameterizing PSP for current study area
+  sim$studyAreaPSP <- ecozones_absk[ecozones_absk$ZONE_NAME %in% ecozones_SA$ZONE_NAME, ] %>%
+    as_Spatial()
+
+  return(invisible(sim))
+}
+
+InitRTM <- function(sim) {
+  cacheTags <- c(currentModule(sim), "function:.inputObjects")
+  dPath <- asPath(getOption("reproducible.destinationPath", dataPath(sim)), 1)
+
   sim$rasterToMatch <- Cache(LandR::prepInputsLCC,
                              year = 2005,
                              studyArea = sim$studyArea,
@@ -152,6 +195,25 @@ Init <- function(sim) {
                              filename2 = paste0(P(sim)$studyAreaName, "_rtm.tif"))
   sim$rasterToMatchLarge <- sim$rasterToMatch
   sim$rasterToMatchReporting <- Cache(maskInputs, sim$rasterToMatch, sim$studyAreaReporting)
+
+  return(invisible(sim))
+}
+
+InitSpecies <- function(sim) {
+  cacheTags <- c(currentModule(sim), "function:.inputObjects")
+  dPath <- asPath(getOption("reproducible.destinationPath", dataPath(sim)), 1)
+
+  sppEquiv <- LandR::sppEquivalencies_CA
+  spp2use <- c("Abie_Bal", "Abie_Las",
+               "Betu_Pap",
+               "Lari_Lar",
+               "Pice_Gla", "Pice_Mar", ## "Pice_Eng" ?
+               "Pinu_Ban", "Pinu_Con",
+               "Popu_Tre")
+  sim$sppEquiv <- sppEquiv[KNN %in% spp2use]
+  sim$sppEquivCol <- "LandR"
+  sim$sppColorVect <- LandR::sppColors(sppEquiv = sim$sppEquiv, sppEquivCol = sim$sppEquivCol,
+                                       palette = "Paired", newVals = "Mixed")
 
   return(invisible(sim))
 }
