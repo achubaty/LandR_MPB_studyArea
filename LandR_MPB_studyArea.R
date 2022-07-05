@@ -1,18 +1,24 @@
 defineModule(sim, list(
   name = "LandR_MPB_studyArea",
-  description = "",
+  description = paste("Prepares 2 sets of objects needed for MPB + LandR-fireSense simulations in western, Canada:",
+                      "1. study areas and corresponding rasterToMatch (as well as large versions);",
+                      "2. species equivalencies tables and the sppEquiv column;",
+                      "Each is customized to the study area parameter passed as studyAreaName."),
   keywords = "",
   authors = c(
     person(c("Alex", "M"), "Chubaty", email = "achubaty@for-cast.ca", role = c("aut", "cre"))
   ),
   childModules = character(0),
-  version = list(SpaDES.core = "1.0.6", LandR_MPB_studyArea = "0.0.0.9000"),
+  version = list(LandR_MPB_studyArea = "0.0.1"),
   timeframe = as.POSIXlt(c(NA, NA)),
   timeunit = "year",
   citation = list("citation.bib"),
   documentation = deparse(list("README.md", "LandR_MPB_studyArea.Rmd")), ## same file
-  reqdPkgs = list("ggplot2", "ggspatial", "raster", "sf",
-                  "PredictiveEcology/mpbutils (>= 0.1.2)"),
+  reqdPkgs = list("ggplot2", "ggspatial", "raster", "sf", "sp",
+                  "PredictiveEcology/mpbutils (>= 0.1.2)",
+                  "PredictiveEcology/reproducible@development (>= 1.2.8.9033)",
+                  "PredictiveEcology/fireSenseUtils@development (>= 0.0.4.9014)",
+                  "PredictiveEcology/LandR@development"),
   parameters = rbind(
     defineParameter(".plotInitialTime", "numeric", start(sim), NA, NA,
                     "Describes the simulation time at which the first plot event should occur."),
@@ -27,19 +33,33 @@ defineModule(sim, list(
     defineParameter(".useCache", "logical", FALSE, NA, NA,
                     paste("Should this entire module be run with caching activated?",
                           "This is generally intended for data-type modules, where stochasticity",
-                          "and time are not relevant"))
+                          "and time are not relevant")),
+    defineParameter("bufferDist", "numeric", 20000, NA, NA,
+                    "Distance (m) to buffer studyArea and rasterToMatch when creating 'Large' versions."),
+    defineParameter("ecoregions4studyArea", "integer", c(112, 120, 122, 124, 126), NA, NA,
+                    "National ecoregions in AB/SK to include in studyArea.")
   ),
   inputObjects = bindrows(
-    expectsInput(objectName = "targetCRS", objectClass = "character",
-                 desc = "", sourceURL = NA)
+    #expectsInput(objectName = "targetCRS", objectClass = "character", desc = "", sourceURL = NA)
   ),
   outputObjects = bindrows(
-    createsOutput(objectName = "absk", objectClass = "sf",
-                  desc = "Alberta and Saskatchewan political outlines"),
-    createsOutput(objectName = "studyArea", objectClass = "SpatialPolygonsDataFrame",
-                  desc = "buffered study area for simulation and fitting"),
-    createsOutput(objectName = "studyAreaReporting", objectClass = "SpatialPolygonsDataFrame",
-                  desc = "unbuffered study area for reporting/post-processing")
+    createsOutput("absk", "sf", "Alberta and Saskatchewan proviwcial boundaries"),
+    createsOutput("rasterToMatch", "RasterLayer", "template raster"),
+    createsOutput("rasterToMatchLarge", "RasterLayer", "template raster for larger area"),
+    createsOutput("rasterToMatchReporting", "RasterLayer", "template raster for reporting area"),
+    createsOutput("sppColorVect", "character", "species colours for plotting"),
+    createsOutput("sppEquiv", "data.table", "table of LandR species names equivalencies"),
+    createsOutput("sppEquivCol", "character", "name of column to use in sppEquiv"),
+    createsOutput("studyAreaPSP", "SpatialPolygonsDataFrame",
+                  paste("this area will be used to subset PSP plots before building the statistical model.",
+                               "Currently PSP datasets with repeat measures exist only for Saskatchewan,",
+                               "Alberta, and Boreal British Columbia")),
+    createsOutput("studyArea", "SpatialPolygonsDataFrame",
+                  "study area used for simulation (buffered to mitigate edge effects)"),
+    createsOutput("studyAreaLarge", "SpatialPolygonsDataFrame",
+                  "study area used for module parameterization (buffered)"),
+    createsOutput("studyAreaReporting", "SpatialPolygonsDataFrame",
+                  "study area used for reporting/post-processing")
   )
 ))
 
@@ -50,29 +70,8 @@ doEvent.LandR_MPB_studyArea = function(sim, eventTime, eventType) {
   switch(
     eventType,
     init = {
-      ### check for more detailed object dependencies:
-      ### (use `checkObject` or similar)
-
-      # do stuff for this event
       sim <- Init(sim)
-
-      # schedule future event(s)
-      # sim <- scheduleEvent(sim, P(sim)$.plotInitialTime, "LandR_MPB_studyArea", "plot")
-      # sim <- scheduleEvent(sim, P(sim)$.saveInitialTime, "LandR_MPB_studyArea", "save")
     },
-    # plot = {
-    #   # ! ----- EDIT BELOW ----- ! #
-    #   studyArea <- mod$gg_studyAreas
-    #   Plot(studyArea)
-    #   # ! ----- STOP EDITING ----- ! #
-    # },
-    # save = {
-    #   # ! ----- EDIT BELOW ----- ! #
-    #   #figPath <- checkPath(file.path(outputPath(sim), "figures"), create = TRUE)
-    #   #ggsave(mod$gg_studyAreas, filename = file.path(figPath, "mpb_studyArea.png"),
-    #   #       width = 7, height = 7)
-    #   # ! ----- STOP EDITING ----- ! #
-    # },
     warning(paste("Undefined event type: \'", current(sim)[1, "eventType", with = FALSE],
                   "\' in module \'", current(sim)[1, "moduleName", with = FALSE], "\'", sep = ""))
   )
@@ -84,49 +83,50 @@ doEvent.LandR_MPB_studyArea = function(sim, eventTime, eventType) {
 
 ### template initialization
 Init <- function(sim) {
-  # # ! ----- EDIT BELOW ----- ! #
+  cacheTags <- c(currentModule(sim), "function:.inputObjects")
+  dPath <- asPath(getOption("reproducible.destinationPath", dataPath(sim)), 1)
 
-  opts <- options(reproducible.useTerra = TRUE)
-  on.exit(options(opts))
+  mod$targetCRS <- paste("+proj=lcc +lat_1=49 +lat_2=77 +lat_0=0 +lon_0=-95",
+                         "+x_0=0 +y_0=0 +units=m +no_defs +ellps=GRS80 +towgs84=0,0,0")
 
-  targetCRS <- sim$targetCRS
   # The following is sloppy -- needs this first preProcess to getData
   #   second prepInputs will fail if the getData didn't already run, because of ...
   tmp_res <- Cache(preProcess,
                    "GADM",
-                   country = "CAN", level = 1, path = inputPath(sim),
+                   country = "CAN", level = 1, path = dPath,
                    dlFun = "raster::getData",
                    targetFile = "gadm36_CAN_1_sp.rds") ## TODO: this will change as GADM data update
+
   sim$absk <- Cache(prepInputs,
                     "GADM",
                     fun = quote(loadABSK(targetFilePath, targetCRS)), #base::readRDS",
-                    dlFun = "raster::getData", targetCRS = sim$targetCRS,
+                    dlFun = "raster::getData", targetCRS = mod$targetCRS,
                     loadABSK = loadABSK,
-                    country = "CAN", level = 1, path = inputPath(sim),
+                    country = "CAN", level = 1, path = dPath,
                     targetFile = "gadm36_CAN_1_sp.rds", ## TODO: this will change as GADM data update
                     cacheRepo = cachePath(sim),
-                    destinationPath = inputPath(sim))
+                    destinationPath = dPath)
 
   slaveLake <- prepInputs(url = "https://static.ags.aer.ca/files/document/DIG/DIG_2008_0793.zip",
                           archive = "DIG_2008_0793.zip",
                           targetFile = "less_bdy_py_tm.shp",
                           alsoExtract = "similar",
                           fun = "sf::st_read",
-                          destinationPath = inputPath(sim))
+                          destinationPath = dPath)
 
   ## study area ecoregions:
   ##   Wabasca Lowlands (112)
   ##   Mid-Boreal Uplands (122, 124, 126)
   ##   Western Alberta Uplands (120)
-  studyAreaReporting <- mpbStudyArea(ecoregions = c(112, 120, 122, 124, 126),
-                                     targetCRS = sim$targetCRS,
+  studyAreaReporting <- mpbStudyArea(ecoregions = P(sim)$ecoregions4studyArea,
+                                     targetCRS = mod$targetCRS,
                                      cPath = cachePath(sim),
-                                     dPath = mod$dPath) %>%
+                                     dPath = dPath) %>%
     st_intersection(., sim$absk) %>%
     st_union(.)
-  studyArea <- st_buffer(studyAreaReporting, 10000) ## 10 km buffer
+  studyArea <- st_buffer(studyAreaReporting, P(sim)$bufferDist)
 
-  # Turn this on or off with P(sim)$.plots
+  ## Turn this on or off with P(sim)$.plots
   figPath <- checkPath(file.path(outputPath(sim), "figures"), create = TRUE)
   Plots(
     data = sim$absk, cols = cols, studyArea = studyAreaReporting, lake = slaveLake,
@@ -137,25 +137,31 @@ Init <- function(sim) {
     ggsaveArgs = list(width = 7, height = 7)
   )
 
+  ## NOTE: studyArea and studyAreaLarge are the same [buffered] area
   ## convert to spdf for use with other modules
   sim$studyAreaReporting <- as_Spatial(studyAreaReporting)
-
-  # Use larger study area to have all data
   sim$studyArea <- as_Spatial(studyArea)
+  sim$studyAreaLarge <- sim$studyArea
+
+  sim$rasterToMatch <- Cache(LandR::prepInputsLCC,
+                             year = 2005,
+                             studyArea = sim$studyArea,
+                             destinationPath = dPath,
+                             useCache = P(sim)$.useCache,
+                             overwrite = TRUE,
+                             filename2 = paste0(P(sim)$studyAreaName, "_rtm.tif"))
+  sim$rasterToMatchLarge <- sim$rasterToMatch
+  sim$rasterToMatchReporting <- Cache(maskInputs, sim$rasterToMatch, sim$studyAreaReporting)
 
   return(invisible(sim))
 }
 
 .inputObjects <- function(sim) {
-  #cacheTags <- c(currentModule(sim), "function:.inputObjects") ## uncomment this if Cache is being used
-  mod$dPath <- asPath(getOption("reproducible.destinationPath", dataPath(sim)), 1)
-  message(currentModule(sim), ": using dataPath '", mod$dPath, "'.")
+  # cacheTags <- c(currentModule(sim), "function:.inputObjects")
+  # dPath <- asPath(getOption("reproducible.destinationPath", dataPath(sim)), 1)
+  # message(currentModule(sim), ": using dataPath '", dPath, "'.")
 
   # ! ----- EDIT BELOW ----- ! #
-  if (!suppliedElsewhere("targetCRS")) {
-    sim$targetCRS <- paste("+proj=lcc +lat_1=49 +lat_2=77 +lat_0=0 +lon_0=-95",
-                           "+x_0=0 +y_0=0 +units=m +no_defs +ellps=GRS80 +towgs84=0,0,0")
-  }
 
   # ! ----- STOP EDITING ----- ! #
   return(invisible(sim))
