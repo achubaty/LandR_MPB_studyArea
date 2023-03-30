@@ -153,7 +153,7 @@ InitStudyAreaRTM <- function(sim) {
   ## provincial boundaries
   sim$absk <- geodata::gadm(country = "CAN", level = 1, path = dPath) |>
     sf::st_as_sf() |>
-    subset(x = _, NAME_1 %in% c("Alberta", "Saskatechewan")) |>
+    subset(x = _, NAME_1 %in% c("Alberta", "Saskatchewan")) |>
     sf::st_transform(sim$targetCRS)
 
   slaveLake <- prepInputs(url = "https://static.ags.aer.ca/files/document/DIG/DIG_2008_0793.zip",
@@ -197,7 +197,7 @@ InitStudyAreaRTM <- function(sim) {
   ##   Mid-Boreal Uplands (122, 124, 126)
   ##   Western Alberta Uplands (120)
   studyAreaReporting <- mpbStudyArea(ecoregions = P(sim)$ecoregions4studyArea,
-                                     targetCRS = targetCRS,
+                                     targetCRS = sim$targetCRS,
                                      cPath = cachePath(sim),
                                      dPath = dPath) %>%
     st_intersection(., sim$absk) %>%
