@@ -47,10 +47,9 @@ defineModule(sim, list(
   ),
   outputObjects = bindrows(
     createsOutput("absk", "sf", "Alberta and Saskatchewan provincial boundaries"),
-    createsOutput("ageMap", "RasterLayer", desc = "Age (time since disturbance) map, derived from national kNN product and ON FRI data."),
     createsOutput("fireSenseForestedLCC", "integer", desc = "vector of LCC classes considered to be forested by fireSense."),
     createsOutput("flammableRTM", "RasterLayer", desc = "RTM without ice/rocks/urban/water. Flammable map with 0 and 1."),
-    createsOutput("LCC", "RasterLayer", desc = "Land cover classification map, derived from national LCC 2005 product and ON FRI data."),
+    createsOutput("LCC", "RasterLayer", desc = "Land cover classification map, derived from national LCC 2005 product."),
     createsOutput("missingLCCgroup", "character", "the group in `nonForestLCCGroups` that describes forested pixels omitted by LandR"),
     createsOutput("nonflammableLCC", "integer", desc = "vector of LCC classes considered to be non-flammable"),
     createsOutput("nonForestLCCGroups", "list",desc = "named list of non-forested landcover groups for fireSense"),
@@ -63,6 +62,7 @@ defineModule(sim, list(
     createsOutput("sppColorVect", "character", desc = "Species colour vector."),
     createsOutput("sppEquiv", "data.table", desc = "Species equivalency table."),
     createsOutput("sppEquivCol", "character", desc = "name of column to use in `sppEquiv`."),
+    createsOutput("standAgeMap", "RasterLayer", desc = "Age (time since disturbance) map, derived from national kNN product."),
     createsOutput("standAgeMap2001", "RasterLayer", desc = "raster of time since disurbance for year 2001."),
     createsOutput("standAgeMap2011", "RasterLayer", desc = "raster of time since disurbance for year 2011."),
     createsOutput("studyArea", "SpatialPolygons", desc = "Buffered study area in which to run simulations."),
@@ -110,8 +110,8 @@ doEvent.LandR_MPB_studyArea = function(sim, eventTime, eventType) {
       Plot(sim$rasterToMatch)
       Plot(sim$rasterToMatchLarge)
 
-      Plot(sim$ageMap2001)
-      Plot(sim$ageMap2011)
+      Plot(sim$standAgeMap2001)
+      Plot(sim$standAgeMap2011)
 
       Plot(sim$LCC)
       # ! ----- STOP EDITING ----- ! #
@@ -336,6 +336,19 @@ InitAge <- function(sim) {
 
   fireYear <- postProcess(fireYear, rasterToMatch = sim$rasterToMatchLarge) ## needed cropping
 
+  standAgeMap <- Cache(
+    LandR::prepInputsStandAgeMap,
+    ageURL = standAgeMapURL,
+    rasterToMatch = sim$rasterToMatchLarge,
+    studyArea = sim$studyAreaLarge,
+    destinationPath = dPath,
+    startTime = 2010,
+    fireFun = "terra::vect",
+    fireURL = fireURL,
+    filename2 = .suffix("standAgeMap.tif", paste0("_", P(sim)$studyAreaName)),
+    userTags = c("stable", currentModule(sim), P(sim)$studyAreaName)
+  )
+
   standAgeMap2001 <- Cache(
     LandR::prepInputsStandAgeMap,
     ageURL = standAgeMapURL,
@@ -369,6 +382,11 @@ InitAge <- function(sim) {
   ## now, adjust pixels which are younger than oldest fires upward
   earliestFireYear <- as.integer(minValue(fireYear))
 
+  minNonDisturbedAge <- 2010L - earliestFireYear
+  toChange <- is.na(fireYear[]) & standAgeMap[] <= minNonDisturbedAge
+  standAgeMap[toChange] <- minNonDisturbedAge + 2L ## make it an even 40 years old instead of 39
+  imputedPixID <- unique(attr(standAgeMap, "imputedPixID"), which(toChange))
+
   minNonDisturbedAge2001 <- 2001L - earliestFireYear
   toChange2001 <- is.na(fireYear[]) & standAgeMap2001[] <= minNonDisturbedAge2001
   standAgeMap2001[toChange2001] <- minNonDisturbedAge2001 + 2L ## make it an even 40 years old instead of 39
@@ -378,6 +396,9 @@ InitAge <- function(sim) {
   toChange2011 <- is.na(fireYear[]) & standAgeMap2011[] <= minNonDisturbedAge2011
   standAgeMap2011[toChange2011] <- minNonDisturbedAge2011 + 2L ## make it an even 50 years old instead of 49
   imputedPixID2011 <- unique(attr(standAgeMap2011, "imputedPixID"), which(toChange2011))
+
+  sim$standAgeMap <- asInteger(standAgeMap)
+  attr(sim$standAgeMap, "imputedPixID") <- imputedPixID
 
   sim$standAgeMap2001 <- asInteger(standAgeMap2001)
   attr(sim$standAgeMap2001, "imputedPixID") <- imputedPixID2001
