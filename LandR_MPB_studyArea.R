@@ -287,7 +287,7 @@ InitStudyAreaLCC <- function(sim) {
   )
   sim$missingLCCGroup <- "nonForest_highFlam"
 
-  sim$LCC <- setValues(sim$LCC, asInteger(getValues(sim$LCC)))
+  sim$LCC <- setValues(sim$LCC, asInteger(values(sim$LCC)))
   sim$LandRforestedLCC <- LandRforestedLCC
   sim$fireSenseForestedLCC <- fireSenseForestedLCC
   sim$nonForestLCCGroups <- nonForestLCCGroups
@@ -380,7 +380,7 @@ InitAge <- function(sim) {
 
   ## stand age maps already adjusted within fire polygons using LandR::prepInputsStandAgeMap.
   ## now, adjust pixels which are younger than oldest fires upward
-  earliestFireYear <- as.integer(minValue(fireYear))
+  earliestFireYear <- as.integer(reproducible::minFn(fireYear))
 
   minNonDisturbedAge <- 2010L - earliestFireYear
   toChange <- is.na(fireYear[]) & standAgeMap[] <= minNonDisturbedAge
