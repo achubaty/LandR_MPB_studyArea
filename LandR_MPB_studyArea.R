@@ -150,11 +150,24 @@ InitStudyAreaRTM <- function(sim) {
   dPath <- asPath(getOption("reproducible.destinationPath", dataPath(sim)), 1)
   message(currentModule(sim), ": using dataPath\n '", dPath, "'.")
 
+  provs <- c("Alberta", "Saskatchewan")
   ## provincial boundaries
-  sim$absk <- geodata::gadm(country = "CAN", level = 1, path = dPath) |>
+  sim$absk <- try(geodata::gadm(country = "CAN", level = 1, path = dPath) |>
     sf::st_as_sf() |>
-    subset(x = _, NAME_1 %in% c("Alberta", "Saskatchewan")) |>
-    sf::st_transform(sim$targetCRS)
+    subset(x = _, NAME_1 %in% provs) |>
+    sf::st_transform(sim$targetCRS))
+  if (is(sim$absk, "try-error") || is.null(sim$absk)) {
+    # -- this has a stashed version on Google Drive if gadm server is down
+    if (!requireNamespace("SpaDES.project"))  {
+      repo <- c("predictiveecology.r-universe.dev", getOption("repos"))
+      install.packages(p, repos = repo)
+      stop("The geodata server is down; please ",
+           "install.packages('SpaDES.project', repos = c(\"predictiveecology.r-universe.dev\", getOption(\"repos\")))")
+    }
+    sim$absk <- SpaDES.project::setupStudyArea(list(country = "CAN", NAME_1 = "Alberta|Saskatchewan", level = 1,
+                                    to = sim$targetCRS), paths = paths(sim))
+
+  }
 
   slaveLake <- prepInputs(url = "https://static.ags.aer.ca/files/document/DIG/DIG_2008_0793.zip",
                           archive = "DIG_2008_0793.zip",
