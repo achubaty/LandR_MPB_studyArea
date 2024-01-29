@@ -1,0 +1,37 @@
+Package: LandR.MPB.studyArea
+Type: Package
+Title: LandR_MPB_studyArea
+Version: 0.0.2
+Description: paste Prepares 2 sets of objects needed for MPB + LandR-fireSense simulations in western Canada: 1. study areas and corresponding rasterToMatch (as well as large versions); 2. species equivalencies tables and the sppEquiv column; Each is customized to the study area parameter passed as studyAreaName.
+Date: 2024-01-29
+Authors@R: 
+  c(person(c("Alex", "M"), "Chubaty", email = "achubaty@for-cast.ca",                    
+    role = c("aut", "cre")), person("Ian", "Eddy", email = "ian.eddy@nrcan-rncan.gc.ca", 
+    role = "ctb"))                                                                       
+Imports:
+    SpaDES.core,
+    archive,
+    geodata,
+    ggplot2,
+    ggspatial,
+    httr,
+    raster,
+    rgeos,
+    sf,
+    sp,
+    mpbutils (>= 0.1.2),
+    reproducible (>= 1.2.8.9033),
+    LandR (>= 1.1.0.9020)
+Suggests:
+    knitr,
+    rmarkdown
+Remotes:
+    PredictiveEcology/mpbutils@main,
+    PredictiveEcology/reproducible@modsForLargeArchives,
+    PredictiveEcology/LandR@development
+Encoding: UTF-8
+License: GPL-3
+VignetteBuilder: knitr, rmarkdown
+ByteCompile: yes
+Roxygen: list(markdown = TRUE)
+RoxygenNote: 7.3.1
