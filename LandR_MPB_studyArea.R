@@ -122,6 +122,8 @@ doEvent.LandR_MPB_studyArea = function(sim, eventTime, eventType) {
   return(invisible(sim))
 }
 
+#' New function
+#' @importFrom LandR speciesInStudyArea
 InitSpecies <- function(sim) {
   # # ! ----- EDIT BELOW ----- ! #
   cacheTags <- c(P(sim)$studyAreaName, currentModule(sim))
