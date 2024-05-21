@@ -100,7 +100,7 @@ doEvent.LandR_MPB_studyArea = function(sim, eventTime, eventType) {
       compareRaster(sim$rasterToMatchLarge, sim$LCC, sim$standAgeMap2001, sim$standAgeMap2011, orig = TRUE)
 
       # schedule future event(s)
-      sim <- scheduleEvent(sim, P(sim)$.plotInitialTime, "Ontario_preamble", "plot", .last())
+      sim <- scheduleEvent(sim, P(sim)$.plotInitialTime, "LandR_MPB_studyArea", "plot", .last())
     },
     plot = {
       # ! ----- EDIT BELOW ----- ! #
