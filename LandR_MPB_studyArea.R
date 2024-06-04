@@ -91,6 +91,10 @@ doEvent.LandR_MPB_studyArea = function(sim, eventTime, eventType) {
       mod$ecoprov <- chunks[which(!is.na(suppressWarnings(as.integer(chunks))))] ## keep as character
       mod$ecoprov <- if (length(mod$ecoprov) > 0) mod$ecoprov else NULL
 
+      # There are some cases that Cache misses, then the prepInputs fail if the
+      #   function was already run -- overwrite = TRUE is fine in all cases. (code stops otherwise)
+      opts <- options(reproducible.overwrite = TRUE)
+      on.exit(options(opts), add = TRUE)
       sim <- InitStudyAreaRTM(sim)
       sim <- InitSpecies(sim) ## needs studyArea defined to identify species to use
       sim <- InitStudyAreaLCC(sim)
