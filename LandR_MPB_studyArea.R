@@ -101,7 +101,7 @@ doEvent.LandR_MPB_studyArea = function(sim, eventTime, eventType) {
       sim <- InitAge(sim)
 
       ## check that rasters all match
-      compareRaster(sim$rasterToMatchLarge, sim$LCC, sim$standAgeMap2001, sim$standAgeMap2011, orig = TRUE)
+      terra::compareGeom(sim$rasterToMatchLarge, sim$LCC, sim$standAgeMap2001, sim$standAgeMap2011)
 
       # schedule future event(s)
       sim <- scheduleEvent(sim, P(sim)$.plotInitialTime, "LandR_MPB_studyArea", "plot", .last())
@@ -375,6 +375,7 @@ InitAge <- function(sim) {
     studyArea = sim$studyAreaLarge,
     destinationPath = dPath,
     startTime = 2001,
+    ageFun = "terra::rast",
     fireFun = "terra::vect",
     fireURL = fireURL,
     filename2 = .suffix("standAgeMap_2001.tif", paste0("_", P(sim)$studyAreaName)),
@@ -391,6 +392,7 @@ InitAge <- function(sim) {
     studyArea = sim$studyAreaLarge,
     destinationPath = dPath,
     startTime = 2011,
+    ageFun = "terra::rast",
     fireFun = "terra::vect",
     fireURL = fireURL,
     filename2 = .suffix("standAgeMap_2011.tif", paste0("_", P(sim)$studyAreaName)),
@@ -419,10 +421,18 @@ InitAge <- function(sim) {
   sim$standAgeMap <- asInteger(standAgeMap)
   attr(sim$standAgeMap, "imputedPixID") <- imputedPixID
 
-  sim$standAgeMap2001 <- asInteger(standAgeMap2001)
+  isInt <- is.integer(terra::values(standAgeMap2001, mat  = FALSE))
+  if (!isInt)
+    standAgeMap2001 <- setValues(standAgeMap2001, as.integer(terra::values(standAgeMap2001, mat  = FALSE)))
+
+  sim$standAgeMap2001 <- standAgeMap2001
   attr(sim$standAgeMap2001, "imputedPixID") <- imputedPixID2001
 
-  sim$standAgeMap2011 <- asInteger(standAgeMap2011)
+  isInt <- is.integer(terra::values(standAgeMap2011, mat  = FALSE))
+  if (!isInt)
+    standAgeMap2011 <- setValues(standAgeMap2011, as.integer(terra::values(standAgeMap2011, mat  = FALSE)))
+
+  sim$standAgeMap2011 <- standAgeMap2011
   attr(sim$standAgeMap2011, "imputedPixID") <- imputedPixID2011
 
   # ! ----- STOP EDITING ----- ! #
