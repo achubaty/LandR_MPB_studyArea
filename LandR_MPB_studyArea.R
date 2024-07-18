@@ -225,8 +225,8 @@ InitStudyAreaRTM <- function(sim) {
 
   ## NOTE: studyArea and studyAreaLarge are the same [buffered] area
   ## convert to spdf for use with other modules
-  sim$studyAreaReporting <- as_Spatial(studyAreaReporting)
-  sim$studyArea <- as_Spatial(studyArea) ## TODO: st_convex_hull() ?
+  sim$studyAreaReporting <- studyAreaReporting
+  sim$studyArea <- studyArea ## TODO: st_convex_hull() ?
   sim$studyAreaLarge <- sim$studyArea
   sim$studyAreaPSP <- ecozone
 
@@ -247,21 +247,21 @@ InitStudyAreaRTM <- function(sim) {
                              studyArea = sim$studyArea,
                              destinationPath = dPath,
                              useCache = P(sim)$.useCache,
-                             filename2 = NULL)
+                             writeTo = NULL)
 
   sim$rasterToMatchLarge <- Cache(LandR::prepInputsLCC,
                                   year = 2005,
                                   studyArea = sim$studyAreaLarge,
                                   destinationPath = dPath,
                                   useCache = P(sim)$.useCache,
-                                  filename2 = NULL)
+                                  writeTo = NULL)
 
   sim$rasterToMatchReporting <- Cache(LandR::prepInputsLCC,
                                       year = 2005,
                                       studyArea = sim$studyAreaReporting,
                                       destinationPath = dPath,
                                       useCache = P(sim)$.useCache,
-                                      filename2 = NULL)
+                                      writeTo = NULL)
 
   writeRaster(sim$rasterToMatch, file.path(dPath, paste0(P(sim)$studyAreaName, "_rtm.tif")),
               datatype = "INT1U", overwrite = TRUE)
@@ -347,24 +347,29 @@ InitAge <- function(sim) {
 
   fireURL <- "https://cwfis.cfs.nrcan.gc.ca/downloads/nfdb/fire_poly/current_version/NFDB_poly.zip"
 
-  fireYear <- Cache(prepInputsFireYear,
-                    earliestYear = 1950,
-                    url = fireURL,
-                    destinationPath = dPath,
-                    rasterToMatch = sim$rasterToMatchLarge)
+  fireYear <-
+    prepInputs(earliestYear = 1950,
+               url = fireURL,
+               fun = prepInputsFireYearFun,
+               prepInputsFireYearFun = prepInputsFireYearFun,
+               destinationPath = dPath,
+               maskTo = sim$studyAreaLarge,
+               to = sim$rasterToMatchLarge) |>
+    Cache()
 
-  fireYear <- postProcess(fireYear, rasterToMatch = sim$rasterToMatchLarge) ## needed cropping
+  # fireYear <- postProcess(fireYear, rasterToMatch = sim$rasterToMatchLarge) ## needed cropping
 
   standAgeMap <- Cache(
     LandR::prepInputsStandAgeMap,
     ageURL = standAgeMapURL,
+    ageFun = "terra::rast",
     rasterToMatch = sim$rasterToMatchLarge,
     studyArea = sim$studyAreaLarge,
     destinationPath = dPath,
     startTime = 2010,
     fireFun = "terra::vect",
     fireURL = fireURL,
-    filename2 = .suffix("standAgeMap.tif", paste0("_", P(sim)$studyAreaName)),
+    writeTo = .suffix("standAgeMap.tif", paste0("_", P(sim)$studyAreaName)),
     userTags = c("stable", currentModule(sim), P(sim)$studyAreaName)
   )
 
@@ -378,7 +383,7 @@ InitAge <- function(sim) {
     ageFun = "terra::rast",
     fireFun = "terra::vect",
     fireURL = fireURL,
-    filename2 = .suffix("standAgeMap_2001.tif", paste0("_", P(sim)$studyAreaName)),
+    writeTo = .suffix("standAgeMap_2001.tif", paste0("_", P(sim)$studyAreaName)),
     userTags = c("stable", currentModule(sim), P(sim)$studyAreaName)
   )
 
@@ -395,7 +400,7 @@ InitAge <- function(sim) {
     ageFun = "terra::rast",
     fireFun = "terra::vect",
     fireURL = fireURL,
-    filename2 = .suffix("standAgeMap_2011.tif", paste0("_", P(sim)$studyAreaName)),
+    writeTo = .suffix("standAgeMap_2011.tif", paste0("_", P(sim)$studyAreaName)),
     userTags = c("stable", currentModule(sim), P(sim)$studyAreaName)
   )
 
@@ -418,7 +423,7 @@ InitAge <- function(sim) {
   standAgeMap2011[toChange2011] <- minNonDisturbedAge2011 + 2L ## make it an even 50 years old instead of 49
   imputedPixID2011 <- unique(attr(standAgeMap2011, "imputedPixID"), which(toChange2011))
 
-  sim$standAgeMap <- asInteger(standAgeMap)
+  sim$standAgeMap <- setValues(standAgeMap, asInteger(values(standAgeMap)))
   attr(sim$standAgeMap, "imputedPixID") <- imputedPixID
 
   isInt <- is.integer(terra::values(standAgeMap2001, mat  = FALSE))
