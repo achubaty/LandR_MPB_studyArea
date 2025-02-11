@@ -15,7 +15,7 @@ defineModule(sim, list(
   timeunit = "year",
   citation = list("citation.bib"),
   documentation = deparse(list("README.md", "LandR_MPB_studyArea.Rmd")), ## same file
-  reqdPkgs = list("archive", "geodata", "ggplot2", "ggspatial", "httr", "raster", "rgeos", "sf", "sp",
+  reqdPkgs = list("archive", "geodata", "ggplot2", "ggspatial", "httr", "raster", "sf", "sp",
                   "PredictiveEcology/mpbutils (>= 0.1.2)",
                   "PredictiveEcology/reproducible@development (>= 1.2.8.9033)",
                   "PredictiveEcology/LandR@development (>= 1.1.0.9020)"),
