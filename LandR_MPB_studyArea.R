@@ -215,12 +215,14 @@ InitStudyAreaRTM <- function(sim) {
   ##   Wabasca Lowlands (112)
   ##   Mid-Boreal Uplands (122, 124, 126)
   ##   Western Alberta Uplands (120)
+  sim$absk <- sf::st_as_sf(sim$absk)
   studyAreaReporting <- mpbStudyArea(ecoregions = P(sim)$ecoregions4studyArea,
                                      targetCRS = sim$targetCRS,
                                      cPath = cachePath(sim),
-                                     dPath = dPath) %>%
-    st_intersection(., sim$absk) %>%
-    st_union(.)
+                                     dPath = dPath) |>
+    st_as_sf() |>
+    st_intersection(sim$absk) |>
+    st_union()
   studyArea <- st_buffer(studyAreaReporting, P(sim)$bufferDist)
 
   ## NOTE: studyArea and studyAreaLarge are the same [buffered] area
@@ -246,21 +248,21 @@ InitStudyAreaRTM <- function(sim) {
                              year = 2005,
                              studyArea = sim$studyArea,
                              destinationPath = dPath,
-                             useCache = P(sim)$.useCache,
+                             useCache = any(nzchar(P(sim)$.useCache)),
                              writeTo = NULL)
 
   sim$rasterToMatchLarge <- Cache(LandR::prepInputsLCC,
                                   year = 2005,
                                   studyArea = sim$studyAreaLarge,
                                   destinationPath = dPath,
-                                  useCache = P(sim)$.useCache,
+                                  useCache = any(nzchar(P(sim)$.useCache)),
                                   writeTo = NULL)
 
   sim$rasterToMatchReporting <- Cache(LandR::prepInputsLCC,
                                       year = 2005,
                                       studyArea = sim$studyAreaReporting,
                                       destinationPath = dPath,
-                                      useCache = P(sim)$.useCache,
+                                      useCache = any(nzchar(P(sim)$.useCache)),
                                       writeTo = NULL)
 
   writeRaster(sim$rasterToMatch, file.path(dPath, paste0(P(sim)$studyAreaName, "_rtm.tif")),
@@ -348,14 +350,22 @@ InitAge <- function(sim) {
   fireURL <- "https://cwfis.cfs.nrcan.gc.ca/downloads/nfdb/fire_poly/current_version/NFDB_poly.zip"
 
   fireYear <-
-    prepInputs(earliestYear = 1950,
-               url = fireURL,
-               fun = prepInputsFireYearFun,
-               prepInputsFireYearFun = prepInputsFireYearFun,
-               destinationPath = dPath,
-               maskTo = sim$studyAreaLarge,
-               to = sim$rasterToMatchLarge) |>
+    prepInputsFireYear(earliestYear = 1950,
+                       url = fireURL,
+                       # prepInputsFireYear = LandR::prepInputsFireYear,
+                       destinationPath = dPath,
+                       studyArea = sim$studyAreaLarge,
+                       rasterToMatch = sim$rasterToMatchLarge) |>
     Cache()
+  # fireYear <-
+  #   prepInputs(earliestYear = 1950,
+  #              url = fireURL,
+  #              fun = LandR::prepInputsFireYear,
+  #              # prepInputsFireYear = LandR::prepInputsFireYear,
+  #              destinationPath = dPath,
+  #              rasterToMatch = sim$rasterToMatchLarge,
+  #              studyArea = sim$studyAreaLarge) |>
+  #   Cache()
 
   # fireYear <- postProcess(fireYear, rasterToMatch = sim$rasterToMatchLarge) ## needed cropping
 
