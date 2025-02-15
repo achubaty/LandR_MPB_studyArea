@@ -233,13 +233,13 @@ InitStudyAreaRTM <- function(sim) {
   sim$studyAreaPSP <- ecozone
 
   ## TODO: move to plot event and update the other plots there to use `Plots()`
-  figPath <- checkPath(file.path(outputPath(sim), "figures"), create = TRUE)
+  # figPath <- checkPath(file.path(outputPath(sim), "figures"), create = TRUE)
   Plots(
     data = sim$absk, cols = cols, studyArea = studyAreaReporting, lake = slaveLake,
     .plotInitialTime = time(sim),
     fn = ggplotStudyAreaFn,
     types = P(sim)$.plots,
-    filename = file.path(figPath, "mpb_studyArea"),
+    filename = file.path(figurePath(sim), "mpb_studyArea"),
     ggsaveArgs = list(width = 7, height = 7)
   )
 
