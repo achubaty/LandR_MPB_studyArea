@@ -225,10 +225,18 @@ InitStudyAreaRTM <- function(sim) {
     st_union()
   studyArea <- st_buffer(studyAreaReporting, P(sim)$bufferDist)
 
+  if (is.null(Par$useKevan)) {
+    sim$studyArea <- postProcess(sim$studyAreaLRG, projectTo = sim$absk)
+    sim$studyAreaReporting <- sim$studyArea
+  } else {
+    sim$studyAreaReporting <- studyAreaReporting
+    sim$studyArea <- studyArea ## TODO: st_convex_hull() ?
+
+  }
+
   ## NOTE: studyArea and studyAreaLarge are the same [buffered] area
   ## convert to spdf for use with other modules
-  sim$studyAreaReporting <- studyAreaReporting
-  sim$studyArea <- studyArea ## TODO: st_convex_hull() ?
+
   sim$studyAreaLarge <- sim$studyArea
   sim$studyAreaPSP <- ecozone
 
